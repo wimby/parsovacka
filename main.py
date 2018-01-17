@@ -50,7 +50,7 @@ def process_doc(lines):
         'total_price': lines['TTL'][0] if 'TTL' in lines else None,
         'price_without_vat': lines['TAXI'][3] if 'TAXI' in lines else None,
         'vat_amount': lines['TAXI'][4] if 'TAXI' in lines else None,
-        'adjustment': sum(map(lambda x: float(x[2]), lines.getlist('ADJI'))),
+        'adjustment': sum(map(lambda x: float(x[3]), lines.getlist('ADJI'))),
         'payment_type': lines['TNDR'][0] if 'TNDR' in lines else None,
         'date': lines['RCPDT'][0] if 'RCPDT' in lines else None,
         'cash_id': lines['ECRDESCR'][0] if 'ECRDESCR' in lines else None,
@@ -78,20 +78,19 @@ def _process_items(items):
 
 
 def append_doc_to_csv(csv1, csv2, doc):
-    if doc['type'] != 'SALES':
+    if doc['type'] != 'SALES' and doc['type'] != 'REFUND':
         logger.info('skipping {}'.format(doc['type']))
         return
 
     if doc['id'] is '':
         logger.info('RCPID is empty')
+        return
 
-    print('{id},{date},{salesman},{price_without_vat},{vat_amount},{adjustment},{payment_type},{cash_id},{total_price}'.format(**doc))
+    csv1.write('{id},{date},{salesman},{price_without_vat},{vat_amount},{adjustment},{payment_type},{cash_id},{total_price}\n'.format(**doc))
 
     for item in doc['items']:
         # TODO sale
-        print('{id},{item_id},{amount},{price},{sale}'.format(id=doc['id'], sale='5', **item))
-
-    # csv.write(line + '\n')
+        csv2.write('{id},{item_id},{amount},{price},{sale}\n'.format(id=doc['id'], sale='5', **item))
 
 
 def split_datadir_arg(datadir):
@@ -146,29 +145,30 @@ def main(argv):
 
     logger.info('Output files are "{}"'.format(outputfile))
 
-    with open(outputfile, 'w+', encoding='utf-8') as csv:
-        processed = 0
-        failed = []
-        try:
-            for filename in tqdm(read_folder(basedir, year, month)):
-                logger.info('started processing file: {}'.format(filename))
-                try:
-                    for lines in parse_csv(filename):
-                        doc = process_doc(lines)
-                        append_doc_to_csv(csv, doc)
-                        processed += 1
-                except KeyboardInterrupt:
-                    raise
-                except Exception as e:
-                    failed.append(filename)
-                    logger.exception(e)
+    with open(outputfile, 'w+', encoding='utf-8') as csv1:
+        with open(outputfile_plu, 'w+', encoding='utf-8') as csv2:
+            processed = 0
+            failed = []
+            try:
+                for filename in tqdm(read_folder(basedir, year, month)):
+                    logger.info('started processing file: {}'.format(filename))
+                    try:
+                        for lines in parse_csv(filename):
+                            doc = process_doc(lines)
+                            append_doc_to_csv(csv1, csv2, doc)
+                            processed += 1
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception as e:
+                        failed.append(filename)
+                        logger.exception(e)
 
-            print('processed {} documents'.format(processed))
-            print('failed: {}'.format(failed if failed else 0))
+                print('processed {} documents'.format(processed))
+                print('failed: {}'.format(failed if failed else 0))
 
-        except FileNotFoundError:
-            logger.exception('Provided directory "{}" does not exist'.format(datadir))
-            sys.exit(1)
+            except FileNotFoundError:
+                logger.exception('Provided directory "{}" does not exist'.format(datadir))
+                sys.exit(1)
 
 
 if __name__ == '__main__':
@@ -189,4 +189,4 @@ if __name__ == '__main__':
     # add ch to logger
     logger.addHandler(ch)
     # main(sys.argv)
-    main(['main.py', './test/2017/03'])
+    main(sys.argv)
