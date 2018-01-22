@@ -47,10 +47,10 @@ def process_doc(lines):
         'type': lines['DOCHDR'][1],
         'id': lines['RCPID'][1] if 'RCPID' in lines else None,
         'salesman': lines['RCPID'][0] if 'RCPID' in lines else None,
-        'total_price': lines['TTL'][0] if 'TTL' in lines else None,
-        'price_without_vat': lines['TAXI'][3] if 'TAXI' in lines else None,
+        'total_price': lines['TTL'][0].replace('.', ',') if 'TTL' in lines else None,
+        'price_without_vat': lines['TAXI'][3].replace('.', ',') if 'TAXI' in lines else None,
         'vat_amount': lines['TAXI'][4] if 'TAXI' in lines else None,
-        'adjustment': sum(map(lambda x: float(x[3]), lines.getlist('ADJI'))),
+        'adjustment': '{:.2f}'.format(sum(map(lambda x: float(x[3]), lines.getlist('ADJI')))).replace('.', ','),
         'payment_type': lines['TNDR'][0] if 'TNDR' in lines else None,
         'date': lines['RCPDT'][0] if 'RCPDT' in lines else None,
         'cash_id': lines['ECRDESCR'][0] if 'ECRDESCR' in lines else None,
@@ -68,9 +68,9 @@ def _process_items(items):
             'order': item[1],
             'item_id': item[2],
             'title': item[3],
-            'price': item[4],
-            'price_total': item[5],
-            'amount': item[6],
+            'price': item[4].replace('.', ','),
+            'price_total': item[5].replace('.', ','),
+            'amount': item[6].replace('.', ','),
             'unit': item[7],
             'type': item[8],
         })
@@ -82,15 +82,18 @@ def append_doc_to_csv(csv1, csv2, doc):
         logger.info('skipping {}'.format(doc['type']))
         return
 
+    if doc['type'] == 'STORNO':
+        raise Exception('hura')
+
     if doc['id'] is '':
         logger.info('RCPID is empty')
         return
 
-    csv1.write('{id},{date},{salesman},{price_without_vat},{vat_amount},{adjustment},{payment_type},{cash_id},{total_price}\n'.format(**doc))
+    csv1.write('{id};{date};{salesman};{price_without_vat};{vat_amount};{adjustment};{payment_type};{cash_id};{total_price}\n'.format(**doc))
 
     for item in doc['items']:
         # TODO sale
-        csv2.write('{id},{item_id},{amount},{price},{sale}\n'.format(id=doc['id'], sale='5', **item))
+        csv2.write('{id};{item_id};{amount};{price};{sale}\n'.format(id=doc['id'], sale='5', **item))
 
 
 def split_datadir_arg(datadir):
