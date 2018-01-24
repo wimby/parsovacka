@@ -65,15 +65,14 @@ def _process_items(items):
     processed = []
     for item in items:
         storno = item[13]
-        price = item[4].replace('.', ',')
-        price_total = item[5].replace('.', ',')
+        amount = item[6].replace('.', ',')
         processed.append({
             'order': item[1],
             'item_id': item[2],
             'title': item[3],
-            'price': '-' + price if storno == 'V' else price,
-            'price_total': price_total,
-            'amount': item[6].replace('.', ','),
+            'price': item[4].replace('.', ','),
+            'price_total': item[5].replace('.', ','),
+            'amount': '-' + amount if storno == 'V' else amount,
             'unit': item[7],
             'type': item[8],
         })
