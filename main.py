@@ -55,26 +55,28 @@ def process_doc(lines):
         'date': lines['RCPDT'][0] if 'RCPDT' in lines else None,
         'cash_id': lines['ECRDESCR'][0] if 'ECRDESCR' in lines else None,
         'vat_id': lines['ECRDESCR'][1] if 'ECRDESCR' in lines else None,
-        'items': _process_items(lines.getlist('SI')),
+        'items': _process_items(lines.getlist('SI'), lines.getlist('ADJI')),
     }
-    # print(lines.getlist('ADJI'))
     return bill
 
 
-def _process_items(items):
+def _process_items(items, adjustments):
+    sales = {adj[0]: adj[3] for adj in adjustments}
     processed = []
     for item in items:
+        item_id = item[2]
         storno = item[13]
         amount = item[6].replace('.', ',')
         processed.append({
             'order': item[1],
-            'item_id': item[2],
+            'item_id': item_id,
             'title': item[3],
             'price': item[4].replace('.', ','),
             'price_total': item[5].replace('.', ','),
             'amount': '-' + amount if storno == 'V' else amount,
             'unit': item[7],
             'type': item[8],
+            'sale': '-' + sales[item_id] if item_id in sales else '',
         })
     return processed
 
@@ -84,9 +86,6 @@ def append_doc_to_csv(csv1, csv2, doc):
         logger.info('skipping {}'.format(doc['type']))
         return
 
-    if doc['type'] == 'STORNO':
-        raise Exception('hura')
-
     if doc['id'] is '':
         logger.info('RCPID is empty')
         return
@@ -94,8 +93,7 @@ def append_doc_to_csv(csv1, csv2, doc):
     csv1.write('{id};{date};{salesman};{price_without_vat};{vat_amount};{adjustment};{payment_type};{cash_id};{total_price}\n'.format(**doc))
 
     for item in doc['items']:
-        # TODO sale
-        csv2.write('{id};{item_id};{amount};{price};{sale}\n'.format(id=doc['id'], sale='5', **item))
+        csv2.write('{id};{item_id};{amount};{price};{sale}\n'.format(id=doc['id'], **item))
 
 
 def split_datadir_arg(datadir):
@@ -136,7 +134,7 @@ def main(argv):
         print_help()
         sys.exit(2)
 
-    outputfile = month
+    outputfile = '{}_{}'.format(year, month)
 
     for opt, arg in opts:
         if opt in ('-h', '--help'):
@@ -145,8 +143,8 @@ def main(argv):
         elif opt in ('-f', '--file'):
             outputfile = arg
 
-    outputfile += '.csv'
     outputfile_plu = outputfile + '_plu.csv'
+    outputfile += '.csv'
 
     logger.info('Output files are "{}"'.format(outputfile))
 
