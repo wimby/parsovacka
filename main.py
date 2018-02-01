@@ -64,19 +64,19 @@ def _process_items(items, adjustments):
     sales = {adj[0]: adj[3] for adj in adjustments}
     processed = []
     for item in items:
-        item_id = item[2]
+        order = item[1]
         storno = item[13]
         amount = item[6].replace('.', ',')
         processed.append({
-            'order': item[1],
-            'item_id': item_id,
+            'order': order,
+            'item_id': item[2],
             'title': item[3],
             'price': item[4].replace('.', ','),
             'price_total': item[5].replace('.', ','),
             'amount': '-' + amount if storno == 'V' else amount,
             'unit': item[7],
             'type': item[8],
-            'sale': '-' + sales[item_id] if item_id in sales else '',
+            'sale': '-' + sales[order] if order in sales else '',
         })
     return processed
 
