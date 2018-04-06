@@ -49,18 +49,18 @@ def process_doc(lines):
         'salesman': lines['RCPID'][0] if 'RCPID' in lines else None,
         'total_price': lines['TTL'][0].replace('.', ',') if 'TTL' in lines else None,
         'price_without_vat': lines['TAXI'][3].replace('.', ',') if 'TAXI' in lines else None,
-        'vat_amount': lines['TAXI'][4] if 'TAXI' in lines else None,
+        'vat_amount': lines['TAXI'][4].replace('.', ',') if 'TAXI' in lines else None,
         'adjustment': '{:.2f}'.format(sum(map(lambda x: float(x[3]), lines.getlist('ADJI')))).replace('.', ','),
         'payment_type': lines['TNDR'][0] if 'TNDR' in lines else None,
         'date': lines['RCPDT'][0] if 'RCPDT' in lines else None,
         'cash_id': lines['ECRDESCR'][0] if 'ECRDESCR' in lines else None,
         'vat_id': lines['ECRDESCR'][1] if 'ECRDESCR' in lines else None,
-        'items': _process_items(lines.getlist('SI'), lines.getlist('ADJI')),
     }
+    bill['items'] = _process_items(lines.getlist('SI'), lines.getlist('ADJI'), bill['type'] == 'REFUND'),
     return bill
 
 
-def _process_items(items, adjustments):
+def _process_items(items, adjustments, refund):
     sales = {adj[0]: adj[3] for adj in adjustments}
     processed = []
     for item in items:
@@ -73,10 +73,10 @@ def _process_items(items, adjustments):
             'title': item[3],
             'price': item[4].replace('.', ','),
             'price_total': item[5].replace('.', ','),
-            'amount': '-' + amount if storno == 'V' else amount,
+            'amount': '-' + amount if storno == 'V' or refund else amount,
             'unit': item[7],
             'type': item[8],
-            'sale': '-' + sales[order] if order in sales else '',
+            'sale': '-' + sales[order].replace('.', ',') if order in sales else '0',
         })
     return processed
 
@@ -191,5 +191,4 @@ if __name__ == '__main__':
 
     # add ch to logger
     logger.addHandler(ch)
-    # main(sys.argv)
     main(sys.argv)
