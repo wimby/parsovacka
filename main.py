@@ -1,6 +1,7 @@
 import csv
 import os
 import logging
+from contextlib import ExitStack
 from getopt import getopt, GetoptError
 
 import sys
@@ -56,7 +57,7 @@ def process_doc(lines):
         'cash_id': lines['ECRDESCR'][0] if 'ECRDESCR' in lines else None,
         'vat_id': lines['ECRDESCR'][1] if 'ECRDESCR' in lines else None,
     }
-    bill['items'] = _process_items(lines.getlist('SI'), lines.getlist('ADJI'), bill['type'] == 'REFUND'),
+    bill['items'] = _process_items(lines.getlist('SI'), lines.getlist('ADJI'), bill['type'] == 'REFUND')
     return bill
 
 
@@ -122,6 +123,7 @@ def get_directory(argv):
 
 def main(argv):
     try:
+        argv = ['', 'test/2017/11']
         datadir = get_directory(argv)
         basedir, year, month = split_datadir_arg(datadir)
         opts, args = getopt(argv[2:], 'hf:', ['help', 'file='])
@@ -148,30 +150,31 @@ def main(argv):
 
     logger.info('Output files are "{}"'.format(outputfile))
 
-    with open(outputfile, 'w+', encoding='utf-8') as csv1:
-        with open(outputfile_plu, 'w+', encoding='utf-8') as csv2:
-            processed = 0
-            failed = []
-            try:
-                for filename in tqdm(read_folder(basedir, year, month)):
-                    logger.info('started processing file: {}'.format(filename))
-                    try:
-                        for lines in parse_csv(filename):
-                            doc = process_doc(lines)
-                            append_doc_to_csv(csv1, csv2, doc)
-                            processed += 1
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception as e:
-                        failed.append(filename)
-                        logger.exception(e)
+    with ExitStack() as s:
+        csv1 = s.enter_context(open(outputfile, 'w+', encoding='utf-8'))
+        csv2 = s.enter_context(open(outputfile_plu, 'w+', encoding='utf-8'))
+        processed = 0
+        failed = []
+        try:
+            for filename in tqdm(read_folder(basedir, year, month)):
+                logger.info('started processing file: {}'.format(filename))
+                try:
+                    for lines in parse_csv(filename):
+                        doc = process_doc(lines)
+                        append_doc_to_csv(csv1, csv2, doc)
+                        processed += 1
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    failed.append(filename)
+                    logger.exception(e)
 
-                print('processed {} documents'.format(processed))
-                print('failed: {}'.format(failed if failed else 0))
+            print('processed {} documents'.format(processed))
+            print('failed: {}'.format(failed if failed else 0))
 
-            except FileNotFoundError:
-                logger.exception('Provided directory "{}" does not exist'.format(datadir))
-                sys.exit(1)
+        except FileNotFoundError:
+            logger.exception('Provided directory "{}" does not exist'.format(datadir))
+            sys.exit(1)
 
 
 if __name__ == '__main__':
